@@ -49,6 +49,13 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/agnel_key ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "echo Connected successfully to EC2"
 
+      - name: Create inventory file
+        run: |
+          echo "[agnel]" > ./temp_inventory.ini
+          echo "${{ secrets.EC2_HOST }}" >> ./temp_inventory.ini
+          echo "Created temporary Ansible inventory:"
+          cat ./temp_inventory.ini
+
       - name: Deploy Flask App via Ansible
         run: |
           ansible-playbook -i "${{ secrets.EC2_HOST }}," \
