@@ -1,6 +1,6 @@
 ---
 - name: Deploy Flask app to EC2
-  hosts: agnel
+  hosts: all
   become: true
   vars:
     app_remote_path: /home/ubuntu/app
