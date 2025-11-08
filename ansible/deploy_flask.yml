@@ -1,0 +1,75 @@
+---
+- name: Deploy Flask app to EC2
+  hosts: agnel
+  become: true
+  vars:
+    app_remote_path: /home/ubuntu/app
+    app_local_relpath: "../app/"
+    docker_image_name: agnel_flask_app
+    docker_container_name: agnel_flask_container
+    host_port: 5001
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install required packages (docker.io, git, rsync)
+      apt:
+        name:
+          - docker.io
+          - git
+          - rsync
+        state: present
+
+    - name: Ensure Docker service is running and enabled
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Add ubuntu user to Docker group
+      user:
+        name: ubuntu
+        groups: docker
+        append: yes
+
+    - name: Create remote app directory
+      file:
+        path: "{{ app_remote_path }}"
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: '0755'
+
+    - name: Copy local app files to remote
+      become: false
+      copy:
+        src: "{{ app_local_relpath }}"
+        dest: "{{ app_remote_path }}/"
+        mode: '0644'
+
+    - name: Build Docker image on remote (using docker CLI)
+      shell: |
+        docker build -t {{ docker_image_name }}:latest {{ app_remote_path }}
+
+    - name: Remove any existing container with same name (force)
+      shell: |
+        docker rm -f {{ docker_container_name }} || true
+
+    - name: Run Docker container (map host_port -> 5000)
+      shell: |
+        docker run -d --name {{ docker_container_name }} -p {{ host_port }}:5000 --restart always {{ docker_image_name }}:latest
+
+    - name: Wait for Flask app to become available (check port {{ host_port }})
+      wait_for:
+        host: 127.0.0.1
+        port: "{{ host_port }}"
+        delay: 5
+        timeout: 45
+      delegate_to: "{{ inventory_hostname }}"
+
+    - name: Show success message
+      debug:
+        msg: "Deployed {{ docker_image_name }} on {{ inventory_hostname }} and listening on host port {{ host_port }}"
