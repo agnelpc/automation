@@ -1,0 +1,27 @@
+---
+- name: Local demo - verify Docker container and HTTP response
+  hosts: localhost
+  connection: local
+  gather_facts: no
+
+  tasks:
+    - name: List docker containers (formatted)
+      # Use raw to prevent Ansible/Jinja from trying to parse {{...}} inside the Docker format string
+      command: >
+        {% raw %}docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Ports}}"{% endraw %}
+      register: docker_ps
+
+    - name: Show docker ps output
+      debug:
+        var: docker_ps.stdout_lines
+
+    - name: Wait for app to be available (curl check)
+      command: >
+        bash -c "for i in {1..10}; do curl -sSf http://localhost:5001 && exit 0 || sleep 1; done; exit 1"
+      register: curl_result
+      failed_when: curl_result.rc != 0
+      changed_when: false
+
+    - name: Show curl result
+      debug:
+        msg: "HTTP OK - app responded on localhost:5001"
